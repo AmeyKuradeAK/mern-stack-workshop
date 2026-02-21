@@ -1,33 +1,74 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 
 const taskIntake = () => {
     const [tasks, setTasks] = useState([]);
     const [task, setTask] = useState("");
     const [description, setDescription] = useState("");
 
-    const handleSubmit = () => {
+    // Fetch initial tasks
+    useEffect(() => {
+        const fetchTasks = async () => {
+            try {
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/tasks`);
+                const data = await res.json();
+                setTasks(data);
+            } catch (error) {
+                console.error("Error fetching tasks:", error);
+            }
+        };
+        fetchTasks();
+    }, []);
+
+    const handleSubmit = async () => {
         if (!task.trim()) return;
 
-        const newTask = {
-            id: Date.now(),
-            title: task,
-            description: description,
-            completed: false
-        };
-
-        setTasks([...tasks, newTask]);
-        setTask("");
-        setDescription("");
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/tasks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: task,
+                    description: description
+                })
+            });
+            const newTask = await res.json();
+            setTasks([newTask, ...tasks]);
+            setTask("");
+            setDescription("");
+        } catch (error) {
+            console.error("Error creating task:", error);
+        }
     };
 
-    const handleDelete = (id) => {
-        setTasks(tasks.filter(t => t.id !== id));
+    const handleDelete = async (id) => {
+        try {
+            await fetch(`${import.meta.env.VITE_API_URL}/tasks/${id}`, {
+                method: 'DELETE'
+            });
+            setTasks(tasks.filter(t => t._id !== id));
+        } catch (error) {
+            console.error("Error deleting task:", error);
+        }
     };
 
-    const toggleComplete = (id) => {
-        setTasks(tasks.map(t =>
-            t.id === id ? { ...t, completed: !t.completed } : t
-        ));
+    const toggleComplete = async (id) => {
+        const taskToUpdate = tasks.find(t => t._id === id);
+        if (!taskToUpdate) return;
+
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/tasks/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ completed: !taskToUpdate.completed })
+            });
+            const updatedTask = await res.json();
+
+            setTasks(tasks.map(t =>
+                t._id === id ? updatedTask : t
+            ));
+        } catch (error) {
+            console.error("Error updating task:", error);
+        }
     };
 
     return (
@@ -104,7 +145,7 @@ const taskIntake = () => {
                         <div className="grid gap-4">
                             {tasks.map((t) => (
                                 <div
-                                    key={t.id}
+                                    key={t._id}
                                     className={`glass rounded-3xl overflow-hidden group transition-all duration-500 hover:shadow-blue-500/5 ${t.completed ? 'opacity-50' : ''}`}
                                 >
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 gap-6 glass-hover">
@@ -121,10 +162,10 @@ const taskIntake = () => {
                                         </div>
                                         <div className="flex gap-3 w-full sm:w-auto mt-4 sm:mt-0">
                                             <button
-                                                onClick={() => toggleComplete(t.id)}
+                                                onClick={() => toggleComplete(t._id)}
                                                 className={`flex-1 sm:flex-none p-3 rounded-2xl flex items-center justify-center transition-all ${t.completed
-                                                        ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                                                        : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/20'
+                                                    ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                                    : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/20'
                                                     }`}
                                                 title={t.completed ? 'Undo' : 'Mark as Complete'}
                                             >
@@ -136,7 +177,7 @@ const taskIntake = () => {
                                                 <span className="sm:hidden ml-2 font-bold">{t.completed ? 'Undo' : 'Done'}</span>
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(t.id)}
+                                                onClick={() => handleDelete(t._id)}
                                                 className="flex-1 sm:flex-none p-3 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 rounded-2xl flex items-center justify-center transition-all"
                                                 title="Delete Objective"
                                             >
